@@ -1,0 +1,7 @@
+fastmcp
+langchain
+langchain-core
+langchain-community
+langchain-ollama
+httpx
+nest-asyncio

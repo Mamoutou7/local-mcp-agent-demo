@@ -4,15 +4,10 @@ import httpx
 from langchain_ollama import ChatOllama
 from langchain_mcp_adapters.client import MultiServerMCPClient
 from langchain.agents.format_scratchpad import format_log_to_str
-#from langchain.agents.output_parsers import ReActSingleInputOutputParser, ReActJsonInputOutputParser
 from langchain_mcp_adapters.tools import MCPTool
 from langchain.agents import AgentExecutor, create_react_agent
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder, HumanMessagePromptTemplate
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
-
-from langchain.tools import tool
-from typing import Any, Optional, Callable, Awaitable
-
 
 nest_asyncio.apply()
 
@@ -43,29 +38,27 @@ class LocalLangchainMCPClient:
             "default": {
                 "url": f"{mcp_server_url}/sse",
                 "transport": "sse",
-                "options": {
-                    "timeout": 10,
-                    "retry_connect": True,
-                    "max_retries": 3,
-                    "read_timeout": 5.0,
-                    "write_timeout": 5.0
-                }
+                "timeout": 10,
             }
-
         }
         self.mcp_client = MultiServerMCPClient(server_config)
         self.tools = []
         self.agent_executor = None
-
 
     async def discover_tools(self):
         print("Discovering tools...")
         try:
             self.tools = await self.mcp_client.get_tools()
             print(f"Tools discovered: {self.tools}")
-            self.tools = [MCPTool(tool, self.mcp_client) for tool in self.tools]
+            # Use StructuredTool objects directly without wrapping in MCPTool
         except AttributeError as e:
             print(f"Error with get_tools: {e}. Trying list_tools...")
+            try:
+                self.tools = await self.mcp_client.list_tools()  # Fallback method
+                print(f"Tools discovered via list_tools: {self.tools}")
+            except Exception as e:
+                print(f"Failed to discover tools: {e}")
+                self.tools = []
 
     def create_agent(self):
         prompt = ChatPromptTemplate.from_template(REACT_PROMPT)
@@ -88,7 +81,6 @@ async def main():
     for q in queries:
         result = await client.run_query(q)
         print(f"Résultat pour : '{q}' : {result}")
-
 
 if __name__ == '__main__':
     asyncio.run(main())
